@@ -1,15 +1,17 @@
-import { BoxGeometry, Mesh, MeshNormalMaterial, OrthographicCamera, PerspectiveCamera, Scene, SphereGeometry, Vector3, WebGLRenderer } from "three";
+import { BoxGeometry, Mesh, MeshNormalMaterial, OrthographicCamera, Scene, SphereGeometry, Vector3, WebGLRenderer } from "three";
 import { Binding, DetectChangesMode } from "./Binding";
 
 class BoxManual extends Mesh {
-    // public override detectChangesMode = DetectChangesMode.manual;
+    public override detectChangesMode = DetectChangesMode.manual;
 
     constructor(material: MeshNormalMaterial) {
         super();
         this.geometry = new BoxGeometry(0.2, 0.2, 0.2);
         this.material = material;
-        this.bindProperty("position", () => { console.log("calcolo"); return new Vector3(-Math.sin(this.rotation.x), -Math.cos(this.rotation.y)) });
+        this.bindProperty("position", () => new Vector3(-Math.sin(this.rotation.x), -Math.cos(this.rotation.y)));
         this.bindProperty("visible", () => this.rotation.x % 2 > 0.4);
+
+        setInterval(() => this.detectChanges(), 1000);
     }
 
     public animate(time: number) {
@@ -34,8 +36,8 @@ class SphereAuto extends Mesh {
     }
 }
 
-const camera = new OrthographicCamera(-5, 5, 5 / 16 * 9, -5 / 16 * 9, 0.01, 100);
-camera.position.z = 1;
+const camera = new OrthographicCamera(-5, 5, 5 / 16 * 9, -5 / 16 * 9, 1, 1000);
+camera.position.z = 100;
 const scene = new Scene();
 const material = new MeshNormalMaterial()
 scene.add(new BoxManual(material), new SphereAuto(material));
@@ -45,7 +47,7 @@ renderer.setAnimationLoop(animation);
 document.getElementById("canvas-container").appendChild(renderer.domElement);
 
 function animation(time: number) {
-    Binding.computeByScene(scene);
+    Binding.autoCompute(scene);
     (scene.children[0] as BoxManual).animate(time);
     (scene.children[1] as SphereAuto).animate(time);
     renderer.render(scene, camera);

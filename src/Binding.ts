@@ -10,6 +10,8 @@ export interface BindingCallbacks<T = any> {
   setValueCallback: (value: T) => void;
 }
 
+export type Object3DPrivate = Object3D & { _boundCallbacks: { [x: string]: BindingCallbacks } };
+
 export class Binding {
   private static _boundObjects: { [index: number]: { [index: number]: Object3D } } = {};
   private static _boundObjectsUnknownScene: { [index: number]: Object3D } = {};
@@ -51,14 +53,14 @@ export class Binding {
   }
 
   private static executeAllCallbacks(obj: Object3D): void {
-    const callbacks = (obj as any)._boundCallbacks as { [x: string]: BindingCallbacks };
+    const callbacks = (obj as Object3DPrivate)._boundCallbacks as { [x: string]: BindingCallbacks };
     for (const key in callbacks) {
       this.executeCallback(callbacks[key]);
     }
   }
 
   public static unbindByKey(obj: Object3D, key: string): void {
-    delete (obj as any)._boundCallbacks[key];
+    delete (obj as Object3DPrivate)._boundCallbacks[key];
   }
 
   public static unbindAll(obj: Object3D): void {
@@ -74,7 +76,7 @@ export class Binding {
     this.executeAllCallbacks(obj);
   }
 
-  public static computeByScene(scene: Scene): void {
+  public static autoCompute(scene: Scene[]): void {
     this.moveUnknownBoundObj();
     const boundScene = this._boundObjects[scene.id];
     if (boundScene) {
@@ -101,7 +103,7 @@ export interface BindingPrototype {
   detectChangesMode: DetectChangesMode;
   detectChanges(): void;
   bindProperty<T extends keyof this>(property: T, getCallback: () => this[T]): this;
-  bindPropertyCallback<T extends keyof this>(property: T, getCallback: () => this[T], setCallbackValue: (value: this[T]) => void): this;
+  bindCallback<T extends keyof this>(key: T, getCallback: () => this[T], setCallbackValue: (value: this[T]) => void): this;
   unbindProperty<T extends keyof this>(property: T): this;
   dispose(): void;
 }
@@ -122,8 +124,8 @@ Object3D.prototype.bindProperty = function (property, getValue) {
   return this;
 };
 
-Object3D.prototype.bindPropertyCallback = function (property, getValue, setValue) {
-  Binding.create(property, getValue, setValue, this);
+Object3D.prototype.bindCallback = function (key, getValue, setValue) {
+  Binding.create(key, getValue, setValue, this);
   return this;
 };
 
@@ -132,8 +134,19 @@ Object3D.prototype.unbindProperty = function (property) {
   return this;
 };
 
-const disposeBase = Object3D.prototype.dispose;
-Object3D.prototype.dispose = function () {
-  disposeBase && disposeBase();
-  Binding.unbindAll(this);
-};
+{
+  const disposeBase = Object3D.prototype.dispose;
+  Object3D.prototype.dispose = function () {
+    disposeBase && disposeBase();
+    Binding.unbindAll(this);
+  };
+}
+
+{
+  const removeBase = Object3D.prototype.remove;
+  Object3D.prototype.remove = function (...object: Object3D[]) {
+    removeBase();
+    // Binding.unbindFromScene(this);
+    return this;
+  };
+}

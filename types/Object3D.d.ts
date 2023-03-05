@@ -7,7 +7,7 @@ export class Object3D extends Object3DBase implements BindingPrototype {
     detectChangesMode: DetectChangesMode;
     detectChanges(): void;
     bindProperty<T extends keyof this>(property: T, getCallback: () => this[T]): this;
-    bindPropertyCallback<T extends keyof this>(property: T, getCallback: () => this[T], setCallbackValue: (value: this[T]) => void): this;
+    bindCallback<T extends keyof this>(property: T, getCallback: () => this[T], setCallbackValue: (value: this[T]) => void): this;
     unbindProperty<T extends keyof this>(property: T): this;
     dispose(): void;
 }
