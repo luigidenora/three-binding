@@ -46,10 +46,12 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setAnimationLoop(animation);
 document.getElementById("canvas-container").appendChild(renderer.domElement);
 
+setTimeout(() => scene.children[1].removeFromParent(), 1000);
+
 function animation(time: number) {
-    Binding.autoCompute(scene);
+    Binding.autoCompute([scene]);
     (scene.children[0] as BoxManual).animate(time);
-    (scene.children[1] as SphereAuto).animate(time);
+    (scene.children[1] as SphereAuto)?.animate(time);
     renderer.render(scene, camera);
 }
 

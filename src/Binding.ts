@@ -1,48 +1,73 @@
 import { Euler, Object3D, Quaternion, Scene, Vector2, Vector3 } from "three";
 
-export enum DetectChangesMode {
-  auto,
-  manual
-}
+export type Object3DPrivate = Object3D & { _boundCallbacks: { [x: string]: BindingCallbacks } };
+export type ScenePrivate = Scene & { _boundObjects: { [x: number]: Object3D } };
 
 export interface BindingCallbacks<T = any> {
   getValueCallback: () => T;
   setValueCallback: (value: T) => void;
 }
 
-export type Object3DPrivate = Object3D & { _boundCallbacks: { [x: string]: BindingCallbacks } };
+export enum DetectChangesMode {
+  auto,
+  manual
+}
 
 export class Binding {
-  private static _boundObjects: { [index: number]: { [index: number]: Object3D } } = {};
-  private static _boundObjectsUnknownScene: { [index: number]: Object3D } = {};
 
   public static create<T>(key: string, getValueCallback: () => T, setValueCallback: (value: T) => void, obj: Object3D): void {
     if (!obj) {
       console.error("Error creating binding. Obj is mandatory.");
       return;
     }
+    this.bindObjCallback({ setValueCallback, getValueCallback }, obj, key);
+    this.bindSceneObj(obj)
+  }
 
-    const bindingCallback: BindingCallbacks = { setValueCallback, getValueCallback };
-
-    if (obj.detectChangesMode === DetectChangesMode.auto) {
-      const scene = this.getSceneFromObj(obj);
-      if (scene) {
-        const sceneBound = this._boundObjects[scene.id] ?? (this._boundObjects[scene.id] = {});
-        sceneBound[obj.id] = obj;
-      } else {
-        this._boundObjectsUnknownScene[obj.id] = obj;
-      }
-    }
-
-    const objBoundCallbacks = (obj as any)._boundCallbacks ?? ((obj as any)._boundCallbacks = {});
-    objBoundCallbacks[key] = bindingCallback;
+  private static bindObjCallback(bindingCallback: BindingCallbacks, obj: Object3D, key: string): void {
+    const boundCallbacks = (obj as Object3DPrivate)._boundCallbacks ?? ((obj as Object3DPrivate)._boundCallbacks = {});
+    boundCallbacks[key] = bindingCallback;
     this.executeCallback(bindingCallback);
   }
 
-  private static getSceneFromObj(obj: Object3D): Scene {
+  private static bindSceneObj(obj: Object3D): void {
+    if (obj.detectChangesMode === DetectChangesMode.auto) {
+      const scene = this.getSceneFromObj(obj);
+      if (scene) {
+        const boundObjects = scene._boundObjects ?? (scene._boundObjects = {});
+        boundObjects[obj.id] = obj;
+      }
+    }
+  }
+
+  public static bindSceneObjAndChildren(obj: Object3D): void {
+    const scene = this.getSceneFromObj(obj);
+    if (scene) {
+      const boundObjects = scene._boundObjects ?? (scene._boundObjects = {});
+      obj.traverse((child) => {
+        if ((child as Object3D).detectChangesMode === DetectChangesMode.auto) {
+          boundObjects[child.id] = child as Object3D;
+        }
+      });
+    }
+  }
+
+  public static unbindSceneObjAndChildren(obj: Object3D): void {
+    const boundObjects = this.getSceneFromObj(obj)?._boundObjects;;
+    if (boundObjects) {
+      obj.traverse((child) => {
+        if ((child as Object3D).detectChangesMode === DetectChangesMode.auto) {
+          delete boundObjects[child.id];
+        }
+      });
+    }
+  }
+
+
+  private static getSceneFromObj(obj: Object3D): ScenePrivate {
     while (obj) {
       if ((obj as Scene).isScene) {
-        return obj as Scene;
+        return obj as ScenePrivate;
       }
       obj = obj.parent;
     }
@@ -53,7 +78,7 @@ export class Binding {
   }
 
   private static executeAllCallbacks(obj: Object3D): void {
-    const callbacks = (obj as Object3DPrivate)._boundCallbacks as { [x: string]: BindingCallbacks };
+    const callbacks = (obj as Object3DPrivate)._boundCallbacks;
     for (const key in callbacks) {
       this.executeCallback(callbacks[key]);
     }
@@ -63,40 +88,19 @@ export class Binding {
     delete (obj as Object3DPrivate)._boundCallbacks[key];
   }
 
-  public static unbindAll(obj: Object3D): void {
-    if (obj.detectChangesMode === DetectChangesMode.auto) {
-      const scene = this.getSceneFromObj(obj);
-      delete this._boundObjects[scene.id][obj.id];
-      delete this._boundObjectsUnknownScene[obj.id];
-    }
-    (obj as any)._boundCallbacks = {};
-  }
-
   public static compute(obj: Object3D): void {
     this.executeAllCallbacks(obj);
   }
 
-  public static autoCompute(scene: Scene[]): void {
-    this.moveUnknownBoundObj();
-    const boundScene = this._boundObjects[scene.id];
-    if (boundScene) {
-      for (const objKey in boundScene) {
-        this.executeAllCallbacks(boundScene[objKey]);
+  public static autoCompute(scenes: Scene[]): void {
+    for (const scene of scenes) {
+      const boundObjs = (scene as ScenePrivate)._boundObjects;
+      for (const objKey in boundObjs) {
+        this.executeAllCallbacks(boundObjs[objKey]);
       }
     }
   }
 
-  private static moveUnknownBoundObj(): void {
-    for (const objKey in this._boundObjectsUnknownScene) {
-      const obj = this._boundObjectsUnknownScene[objKey];
-      const scene = this.getSceneFromObj(obj);
-      if (scene) {
-        const sceneBound = this._boundObjects[scene.id] ?? (this._boundObjects[scene.id] = {});
-        sceneBound[objKey] = this._boundObjectsUnknownScene[objKey];
-        delete this._boundObjectsUnknownScene[objKey];
-      }
-    }
-  }
 }
 
 export interface BindingPrototype {
@@ -135,18 +139,23 @@ Object3D.prototype.unbindProperty = function (property) {
 };
 
 {
-  const disposeBase = Object3D.prototype.dispose;
-  Object3D.prototype.dispose = function () {
-    disposeBase && disposeBase();
-    Binding.unbindAll(this);
+  const addBase = Object3D.prototype.add;
+  Object3D.prototype.add = function (object: Object3D) {
+    addBase.bind(this)(...arguments);
+    if (arguments.length == 1 && object !== this && object?.isObject3D) {
+      Binding.bindSceneObjAndChildren(object);
+    }
+    return this;
   };
 }
 
 {
   const removeBase = Object3D.prototype.remove;
-  Object3D.prototype.remove = function (...object: Object3D[]) {
-    removeBase();
-    // Binding.unbindFromScene(this);
+  Object3D.prototype.remove = function (object: Object3D) {
+    if (arguments.length == 1 && this.children.indexOf(object) !== -1) {
+      Binding.unbindSceneObjAndChildren(object);
+    }
+    removeBase.bind(this)(...arguments);
     return this;
   };
 }
