@@ -8,7 +8,6 @@ export class Mesh extends MeshBase implements BindingPrototype {
     detectChangesMode: DetectChangesMode;
     detectChanges(): void;
     bindProperty<T extends keyof this>(property: T, getCallback: () => this[T]): this;
-    bindCallback<T extends keyof this>(property: T, getCallback: () => this[T], setCallbackValue: (value: this[T]) => void): this;
+    bindCallback(key: string, callback: () => void): this;
     unbindProperty<T extends keyof this>(property: T): this;
-    dispose(): void;
 }

@@ -1,6 +1,6 @@
 import { Euler, Object3D, Quaternion, Scene, Vector2, Vector3 } from "three";
 
-export type Object3DPrivate = Object3D & { _boundCallbacks: { [x: string]: BindingCallbacks } };
+export type Object3DPrivate = Object3D & { _boundCallbacks: { [x: string]: BindingCallbacks }, _detectChangesMode: DetectChangesMode };
 export type ScenePrivate = Scene & { _boundObjects: { [x: number]: Object3D } };
 
 export interface BindingCallbacks<T = any> {
@@ -45,7 +45,7 @@ export class Binding {
     if (scene) {
       const boundObjects = scene._boundObjects ?? (scene._boundObjects = {});
       obj.traverse((child) => {
-        if ((child as Object3D).detectChangesMode === DetectChangesMode.auto) {
+        if ((child as Object3D).detectChangesMode === DetectChangesMode.auto && (child as Object3DPrivate)._boundCallbacks) {
           boundObjects[child.id] = child as Object3D;
         }
       });
@@ -107,20 +107,29 @@ export interface BindingPrototype {
   detectChangesMode: DetectChangesMode;
   detectChanges(): void;
   bindProperty<T extends keyof this>(property: T, getCallback: () => this[T]): this;
-  bindCallback<T extends keyof this>(key: T, getCallback: () => this[T], setCallbackValue: (value: this[T]) => void): this;
+  bindCallback(key: string, callback: () => void): this;
   unbindProperty<T extends keyof this>(property: T): this;
-  dispose(): void;
 }
 
-Object3D.prototype.detectChangesMode = DetectChangesMode.auto; //TODO lock change
+Object.defineProperty(Object3D.prototype, 'detectChangesMode', {
+  get() {
+    return this._detectChangesMode ?? DetectChangesMode.auto;
+  }, set(value) {
+    if (this._detectChangesMode === undefined) {
+      this._detectChangesMode = value;
+    } else {
+      console.error("Cannot change detectChangesMode");
+    }
+  },
+});
 
 Object3D.prototype.detectChanges = function () {
   Binding.compute(this);
 };
 
 Object3D.prototype.bindProperty = function (property, getValue) {
-  if ((this[property] as Vector3).isVector3 || (this[property] as Vector2).isVector2 ||
-    (this[property] as Quaternion).isQuaternion || (this[property] as Euler).isEuler) {
+  if ((this[property] as Vector3)?.isVector3 || (this[property] as Vector2)?.isVector2 ||
+    (this[property] as Quaternion)?.isQuaternion || (this[property] as Euler)?.isEuler) {
     Binding.create(property, getValue, (value) => { (this[property] as any).copy(value) }, this);
   } else {
     Binding.create(property, getValue, (value) => { this[property] = value }, this);
@@ -128,10 +137,13 @@ Object3D.prototype.bindProperty = function (property, getValue) {
   return this;
 };
 
-Object3D.prototype.bindCallback = function (key, getValue, setValue) {
-  Binding.create(key, getValue, setValue, this);
-  return this;
-};
+{
+  const emptySet = () => { };
+  Object3D.prototype.bindCallback = function (key, callback) {
+    Binding.create(key, callback, emptySet, this);
+    return this;
+  };
+}
 
 Object3D.prototype.unbindProperty = function (property) {
   Binding.unbindByKey(this, property);

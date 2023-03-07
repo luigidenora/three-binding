@@ -1,58 +1,84 @@
-import { BoxGeometry, Mesh, MeshNormalMaterial, OrthographicCamera, Scene, SphereGeometry, Vector3, WebGLRenderer } from "three";
+import { AmbientLight, BoxGeometry, BufferGeometry, DirectionalLight, Line, LineBasicMaterial, Mesh, MeshLambertMaterial, PerspectiveCamera, Scene, Vector2, Vector3, WebGLRenderer } from "three";
 import { Binding, DetectChangesMode } from "./Binding";
 
-class BoxManual extends Mesh {
-    public override detectChangesMode = DetectChangesMode.manual;
+class BoxAutoUpdate extends Mesh {
+    private static geometry = new BoxGeometry(0.2, 0.2, 0.2);
+    public override parent: CustomScene;
+    private _speed = new Vector3(Math.random(), Math.random(), Math.random());
 
-    constructor(material: MeshNormalMaterial) {
-        super();
-        this.geometry = new BoxGeometry(0.2, 0.2, 0.2);
-        this.material = material;
-        this.bindProperty("position", () => new Vector3(-Math.sin(this.rotation.x), -Math.cos(this.rotation.y)));
-        this.bindProperty("visible", () => this.rotation.x % 2 > 0.4);
-
-        setInterval(() => this.detectChanges(), 1000);
+    private get time(): number {
+        return this.parent?.time ?? 0;
     }
 
-    public animate(time: number) {
-        this.rotation.x = time / 2000;
-        this.rotation.y = time / 1000;
-    }
-}
+    constructor(material: MeshLambertMaterial, colorIndex: number) {
+        super(BoxAutoUpdate.geometry, material);
+        this.position.set(Math.random() * 4 + 0.2, Math.random() * 8 - 4, Math.random() * 5);
 
-class SphereAuto extends Mesh {
+        this.bindProperty("visible", () => this.parent?.colorVisibility[colorIndex] && this.parent?.showAutoUpdateObjects);
 
-    constructor(material: MeshNormalMaterial) {
-        super();
-        this.geometry = new SphereGeometry(0.2, 50, 50);
-        this.material = material;
-        this.bindProperty("position", () => new Vector3(Math.sin(this.rotation.x), Math.cos(this.rotation.y)));
-        this.bindProperty("visible", () => this.rotation.x % 2 > 0.3);
-    }
+        this.bindProperty("scale", () => new Vector3().setScalar(0.2 + Math.abs(Math.sin(this._speed.length() * this.time)) * 0.8));
 
-    public animate(time: number) {
-        this.rotation.x = time / 2000;
-        this.rotation.y = time / 1000;
+        this.bindCallback("rotation", () => {
+            this.rotation.x = this._speed.x * this.time;
+            this.rotation.y = this._speed.y * this.time;
+            this.rotation.z = this._speed.z * this.time;
+        });
     }
 }
 
-const camera = new OrthographicCamera(-5, 5, 5 / 16 * 9, -5 / 16 * 9, 1, 1000);
-camera.position.z = 100;
-const scene = new Scene();
-const material = new MeshNormalMaterial()
-scene.add(new BoxManual(material), new SphereAuto(material));
+class BoxManualUpdate extends BoxAutoUpdate {
+
+    constructor(material: MeshLambertMaterial, colorIndex: number) {
+        super(material, colorIndex);
+        this.detectChangesMode = DetectChangesMode.manual;
+        this.position.x = -this.position.x;
+
+        this.bindProperty("visible", () => !this.parent || (this.parent.colorVisibility[colorIndex] && this.parent.showManualUpdateObjects));
+        
+        setInterval(() => this.detectChanges(), 1000 / 2); //update like 2 fps
+    }
+}
+
+class CustomScene extends Scene {
+    public colorVisibility: boolean[] = [true, true, true];
+    public showAutoUpdateObjects = true;
+    public showManualUpdateObjects = true;
+    public time = 0;
+
+    constructor() {
+        super();
+
+        this.add(
+            new DirectionalLight(0xffffff, 1).translateZ(1),
+            new Line(new BufferGeometry().setFromPoints([new Vector2(0, Number.MIN_SAFE_INTEGER), new Vector2(0, Number.MAX_SAFE_INTEGER)]),
+                new LineBasicMaterial({ color: 0xffffff }))
+        );
+
+        const material = [
+            new MeshLambertMaterial({ color: 0xff0000 }),
+            new MeshLambertMaterial({ color: 0x00ff00 }),
+            new MeshLambertMaterial({ color: 0x0000ff }),
+        ];
+        for (let i = 0; i < 99; i++) {
+            const index = i % 3;
+            this.add(new BoxAutoUpdate(material[index], index));
+            this.add(new BoxManualUpdate(material[index], index));
+        }
+    }
+}
+
+const camera = new PerspectiveCamera().translateZ(10);
+const scene = new CustomScene();
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setAnimationLoop(animation);
+renderer.setAnimationLoop(animate);
 document.getElementById("canvas-container").appendChild(renderer.domElement);
+const scenes = [scene];
 
-setTimeout(() => scene.children[1].removeFromParent(), 1000);
-
-function animation(time: number) {
-    Binding.autoCompute([scene]);
-    (scene.children[0] as BoxManual).animate(time);
-    (scene.children[1] as SphereAuto)?.animate(time);
+function animate(time: number) {
+    scene.time = time / 1000;
+    Binding.autoCompute(scenes);
     renderer.render(scene, camera);
 }
 
-(window as any).Binding = Binding; //DEBUG
+(window as any).scene = scene;
