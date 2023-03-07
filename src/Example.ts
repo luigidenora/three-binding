@@ -1,8 +1,10 @@
-import { AmbientLight, BoxGeometry, BufferGeometry, DirectionalLight, Line, LineBasicMaterial, Mesh, MeshLambertMaterial, PerspectiveCamera, Scene, Vector2, Vector3, WebGLRenderer } from "three";
+import { BoxGeometry, BufferGeometry, DirectionalLight, Line, LineBasicMaterial, Mesh, MeshLambertMaterial, PerspectiveCamera, Scene, Vector2, Vector3, WebGLRenderer } from "three";
 import { Binding, DetectChangesMode } from "./Binding";
+import Stats from "three/examples/jsm/libs/stats.module";
+import { GUI } from "lil-gui";
 
 class BoxAutoUpdate extends Mesh {
-    private static geometry = new BoxGeometry(0.2, 0.2, 0.2);
+    private static geometry = new BoxGeometry(0.5, 0.5, 0.5);
     public override parent: CustomScene;
     private _speed = new Vector3(Math.random(), Math.random(), Math.random());
 
@@ -12,8 +14,18 @@ class BoxAutoUpdate extends Mesh {
 
     constructor(material: MeshLambertMaterial, colorIndex: number) {
         super(BoxAutoUpdate.geometry, material);
-        this.position.set(Math.random() * 4 + 0.2, Math.random() * 8 - 4, Math.random() * 5);
+        this.position.set(Math.random() * 12 + 0.5, Math.random() * 10 - 5, Math.random());
 
+        // this.parent is null here. To avoid exeption you can use "added" event (raised when this obj is added to obj/scene) 
+        /** 
+         * const event = () => {
+         *  this.bindProperty("visible", () => this.parent.colorVisibility[colorIndex] && this.parent.showAutoUpdateObjects);
+         *  this.removeEventListener("added", event);
+         * };
+         * this.addEventListener("added", event); 
+        */
+
+        // or you can check if this.parent is defined
         this.bindProperty("visible", () => this.parent?.colorVisibility[colorIndex] && this.parent?.showAutoUpdateObjects);
 
         this.bindProperty("scale", () => new Vector3().setScalar(0.2 + Math.abs(Math.sin(this._speed.length() * this.time)) * 0.8));
@@ -34,7 +46,7 @@ class BoxManualUpdate extends BoxAutoUpdate {
         this.position.x = -this.position.x;
 
         this.bindProperty("visible", () => !this.parent || (this.parent.colorVisibility[colorIndex] && this.parent.showManualUpdateObjects));
-        
+
         setInterval(() => this.detectChanges(), 1000 / 2); //update like 2 fps
     }
 }
@@ -49,7 +61,7 @@ class CustomScene extends Scene {
         super();
 
         this.add(
-            new DirectionalLight(0xffffff, 1).translateZ(1),
+            new DirectionalLight(0xffffff, 1).translateZ(10),
             new Line(new BufferGeometry().setFromPoints([new Vector2(0, Number.MIN_SAFE_INTEGER), new Vector2(0, Number.MAX_SAFE_INTEGER)]),
                 new LineBasicMaterial({ color: 0xffffff }))
         );
@@ -59,26 +71,53 @@ class CustomScene extends Scene {
             new MeshLambertMaterial({ color: 0x00ff00 }),
             new MeshLambertMaterial({ color: 0x0000ff }),
         ];
+
         for (let i = 0; i < 99; i++) {
             const index = i % 3;
-            this.add(new BoxAutoUpdate(material[index], index));
-            this.add(new BoxManualUpdate(material[index], index));
+            this.add(
+                new BoxAutoUpdate(material[index], index),
+                new BoxManualUpdate(material[index], index)
+            );
         }
     }
 }
 
-const camera = new PerspectiveCamera().translateZ(10);
+const camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000).translateZ(10);
 const scene = new CustomScene();
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setAnimationLoop(animate);
-document.getElementById("canvas-container").appendChild(renderer.domElement);
+const stats = Stats();
 const scenes = [scene];
+document.body.appendChild(renderer.domElement);
+document.body.appendChild(stats.dom);
+window.addEventListener("resize", onWindowResize);
 
 function animate(time: number) {
     scene.time = time / 1000;
     Binding.autoCompute(scenes);
     renderer.render(scene, camera);
+    stats.update();
 }
 
-(window as any).scene = scene;
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+const layers = {
+    "toggle red": true,
+    "toggle green": true,
+    "toggle blue": true,
+    "toggle box with detectionMode auto": true,
+    "toggle box with detectionMode manual": true,
+    "speed": 1,
+};
+
+const gui = new GUI();
+gui.add(layers, "toggle red").onChange((value: boolean) => scene.colorVisibility[0] = value);
+gui.add(layers, "toggle green").onChange((value: boolean) => scene.colorVisibility[1] = value);
+gui.add(layers, "toggle blue").onChange((value: boolean) => scene.colorVisibility[2] = value);
+gui.add(layers, "toggle box with detectionMode auto").onChange((value: boolean) => scene.showAutoUpdateObjects = value);
+gui.add(layers, "toggle box with detectionMode manual").onChange((value: boolean) => scene.showManualUpdateObjects = value);
