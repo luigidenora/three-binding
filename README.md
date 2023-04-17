@@ -38,8 +38,8 @@ unbindByKey(key: string): this;
 
 ### Example
 ```javascript
-const materialRed = new MeshBasicMaterial(0xff0000);
-const materialYellow = new MeshBasicMaterial(0xffff00);
+const materialRed = new MeshBasicMaterial({ color: 0xff0000 }));
+const materialYellow = new MeshBasicMaterial({ color: 0xffff00 }));
 const mesh = new Mesh(new BufferGeometry());
 mesh.bindProperty("material", () => mesh.isActive ? materialYellow : materialRed);
 mesh.isActive = true; // this will change material
