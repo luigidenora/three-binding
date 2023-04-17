@@ -1,13 +1,13 @@
 {
 	"compilerOptions": {
-		"module": "commonjs",
-		"target": "ES2016",
-		"forceConsistentCasingInFileNames": true,
+		"module": "ES2015",
+		"target": "ES2015",
 		"strict": true,
-		"sourceMap": true,
+		"esModuleInterop": true,
 		"noImplicitOverride": true,
+		"skipLibCheck": true,
+		"declaration": true,
 		"strictNullChecks": false,
-		"moduleResolution": "node",
 		"outDir": "dist",
 		"paths": {
 			"three": [
@@ -21,6 +21,7 @@
 	],
 	"exclude": [
 		".git",
-		"node_modules"
+		"node_modules",
+		"dist"
 	]
 }
