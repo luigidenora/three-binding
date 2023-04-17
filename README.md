@@ -1,6 +1,8 @@
 # three-binding
 
-Adds some functions to **Object3D**. <br />
+Adds some functions to **Object3D**. 
+<br />
+<br />
 
 ## Main functions
 
