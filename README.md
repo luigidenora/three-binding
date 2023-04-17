@@ -91,6 +91,37 @@ computeAutoBinding(): void;
 <br />
 <br />
 
-# How to override Object3D types if use typescript 
+# How to override Object3D types if use typescript and @types/three
 
-soon
++ Add this to tsconfig.json:
+```javascript
+"paths": {
+  "three": [
+    "./types/three.d.ts"
+  ]
+}
+```
++ Create a folder to the root and call it **types**.
++ Inside types folder create **Object3D.d.ts.** file and past this inside:
+```javascript
+import { Object3D as Object3DBase } from "three/index";
+import { BindingPrototype, DetectChangesMode } from "three-binding";
+
+export class Object3D extends Object3DBase implements BindingPrototype {
+  override parent: Object3D;
+  override children: Object3D[];
+  detectChangesMode: DetectChangesMode;
+  detectChanges(): void;
+  bindProperty<T extends keyof this>(property: T, getCallback: () => this[T], bindAfterParentAdded?: boolean): this;
+  bindCallback(key: string, callback: () => void, bindAfterParentAdded?: boolean): this;
+  unbindByKey(key: string): this;
+}
+```
++ Inside types folder create **three.d.ts.** file and past this inside:
+```javascript
+export * from "./Object3D";
+
+// @ts-ignore
+export * from 'three/index';
+```
+**Note:** This overrides only Object3D types definitions. You should override also Mesh, Group, ecc.
