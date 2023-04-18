@@ -90,8 +90,8 @@ computeAutoBinding(): void;
 import { computeAutoBinding } from "three-binding";
 
 function animate(time) {
-  computeAutoBinding(this.scene);
-  this.renderer.render(this.scene, this.scene.camera);
+  computeAutoBinding(scene);
+  renderer.render(scene, camera);
 }
 ``` 
 <br />
