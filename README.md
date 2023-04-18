@@ -73,7 +73,7 @@ group.detectChanges();
 <br />
 <br />
 
-## How it works
+## Usage
 
 To let all binding work you need to use **computeAutoBinding** function, it will resolve all binded expressions for every Object3D with the auto detection. <br />
 I suggest to use it in animation cycle, before render.
@@ -83,6 +83,18 @@ computeAutoBinding(): void;
 ```
 *Executes all callbacks bound to objects with detectChangesMode set to 'auto'.* <br />
 **scenes**: Scene or Scene array where execute bound callbacks. <br />
+<br />
+
+### Example
+```javascript
+import { computeAutoBinding } from "three-binding";
+
+function animate(time) {
+  computeAutoBinding(this.scene);
+  this.renderer.render(this.scene, this.scene.camera);
+}
+``` 
+<br />
 <br />
 
 # Complete examples
