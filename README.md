@@ -1,6 +1,6 @@
 # three-binding
 
-Adds some functions to **Object3D**. 
+Adds data binding functions to **Object3D**. 
 <br />
 <br />
 
