@@ -1,6 +1,6 @@
 {
   "name": "three-binding",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "three.js Object3D data binding",
   "scripts": {
     "build": "tsc",
